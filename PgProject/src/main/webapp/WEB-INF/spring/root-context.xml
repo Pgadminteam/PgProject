@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mybatis-spring="http://mybatis.org/schema/mybatis-spring"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring-1.2.xsd
+		http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+
+	<bean id="hikariConfig" class="com.zaxxer.hikari.HikariConfig">
+		<property name="driverClassName"
+			value="oracle.jdbc.driver.OracleDriver" />
+		<property name="jdbcUrl"
+			value="jdbc:oracle:thin:@localhost:1521:orcl" />
+		<property name="username" value="system" />
+		<property name="password" value="admin" />
+		<property name="maximumPoolSize" value="5" />
+	</bean>
+
+	<bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource"
+		destroy-method="close">
+		<constructor-arg ref="hikariConfig" />
+	</bean>
+	<bean id="sqlSessionFactory"
+		class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+	<tx:annotation-driven transaction-manager="transactionManager"/>
+	<!-- 이메일 인증 처리 -->
+	<!-- 1) 이메일 관련 SMTP 서버의 주소(smtp_host)
+		 2) gmail port번호(587)
+		 3) defalutEncoding(기본 인코딩 설정)
+		 4) 인증을 위한 사용자명 username(gmail id)
+		 5) 인증을 위한 사용자의 password(비밀번호) 등을 정의합니다.-->
+	<bean id="mailSender" class="org.springframework.mail.javamail.JavaMailSenderImpl">
+		<property name="host" value="smtp.gmail.com" />
+		<property name="port" value="587" />
+		<property name="defaultEncoding" value="utf-8" />
+		<property name="username" value="abcde@gmail.com" />
+		<property name="password" value="12345" />
+		<property name="javaMailProperties">
+			<!-- email 요청시 SMTP -->
+			<props>
+				<prop key="mail.transport.protocol">smtp</prop>
+				<prop key="mail.smtp.auth">true</prop>
+				<prop key="mail.smtp.starttls.enable">true</prop>
+				<prop key="mail.debug">true</prop>
+			</props>
+		</property>
+	</bean>
+	<bean id="email" class="www.dream.com.framework.email.model.Email">
+	</bean>
+	<bean id="emailSender"
+		class="www.dream.com.framework.email.EmailSender">
+	</bean>
+
+	<context:component-scan
+		base-package="www.dream.com.framework.util"></context:component-scan>
+	<context:component-scan
+		base-package="www.dream.com.framework.attachFile.service"></context:component-scan>
+	<context:component-scan
+		base-package="www.dream.com.framework.hashTagAnalyzer.service"></context:component-scan>
+	<context:component-scan
+		base-package="www.dream.com.party.service"></context:component-scan>
+	<context:component-scan
+		base-package="www.dream.com.board.service"></context:component-scan>
+
+	<mybatis-spring:scan
+		base-package="www.dream.com.framework.attachFile.model.mapper" />
+	<mybatis-spring:scan
+		base-package="www.dream.com.framework.hashTagAnalyzer.model.mapper" />
+	<mybatis-spring:scan
+		base-package="www.dream.com.framework.model.mapper" />
+	<mybatis-spring:scan
+		base-package="www.dream.com.party.model.mapper" />
+	<mybatis-spring:scan
+		base-package="www.dream.com.product.model.mapper" />
+	<mybatis-spring:scan
+		base-package="www.dream.com.board.model.mapper" />
+
+	<aop:aspectj-autoproxy></aop:aspectj-autoproxy>
+</beans>

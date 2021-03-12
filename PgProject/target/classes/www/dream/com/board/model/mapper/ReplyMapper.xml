@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 
+Log 장치 대신에 Mybatis 실행 시 CachingExecutor이 클래스의 줄 86 89 등의 query함수에 
+Break Point를 잡으면 확실하게 디버깅 할 수 있습니다. 
+ -->  
+<mapper namespace="www.dream.com.board.model.mapper.ReplyMapper">
+	<!-- cache
+  eviction="SOFT"
+  flushInterval="10"
+  size="1024"
+  readOnly="true"/ -->
+  
+	<resultMap id="replyResultMap"
+		type="www.dream.com.board.model.ReplyVO"
+		extends="www.dream.com.framework.model.mapper.FrameworkMapper.commonMngInfoResultMap">
+		<constructor>
+			<idArg column="id" javaType="long" />
+		</constructor>
+		<result property="content" column="content" />
+		<result property="viewcnt" column="viewcnt" />
+		<result property="countOfReply" column="count_of_reply" />
+
+		<association property="writer" column="writer_id" 
+			resultMap="www.dream.com.party.model.mapper.PartyMapper.partyResultMap" columnPrefix="w_">
+		</association>
+		<collection property="listHashTag"
+			ofType="www.dream.com.framework.hashTagAnalyzer.model.HashTagVO" 
+			columnPrefix="ht_">
+			<constructor>
+				<idArg column="id" javaType="long" />
+			</constructor>
+			<result property="word" column="word" />
+		</collection>
+
+		<discriminator javaType="String" column="obj_type">
+			<case value="post" resultMap="postResultMap" />
+		</discriminator>
+	</resultMap>
+	<resultMap id="postResultMap"
+		type="www.dream.com.board.model.PostVO" extends="replyResultMap">
+		<result property="title" column="title" />
+		<result property="boardId" column="board_id" />
+		<result property="likeCount" column="like_count" />
+		<result property="dislikeCount" column="dislike_count" />
+	</resultMap>
+	
+	<!-- 검색 기능 : foreach로 검색해서 단어(word)를 찾기 위한 영역입니다. -->
+	<sql id="searchSql">
+		<where>
+			<if test="criteria.searchArr != null">
+			p.id in (
+			 	   select reply_id
+                     from M_HT_Reply m
+					where m.hash_tag_id in (
+						  SELECT id
+						    FROM T_Hash_Tag
+					 	   START WITH word in
+					 	   <foreach item="word" collection="criteria.searchArr" open="(" separator="," close=")">
+					 	   		#{word}
+					 	   </foreach> 
+						 CONNECT BY PRIOR id = super_id)
+				   )
+			</if>
+		   and p.board_id = #{boardId}
+		   and p.obj_type = 'post'
+		</where>	
+	</sql>
+	
+	<!-- 게시글 개수, 페이징 처리를 하기 위한 영역입니다. -->
+	<!-- useCache="false" flushCache="true" -->
+	<select id="countTotalPostWithPaging" resultType="_long" > 
+	<![CDATA[
+		select count(*)
+		  from T_Reply p
+	]]>
+		<include refid="searchSql"></include>
+	</select>
+	
+	<!-- 게시글 목록, 페이징 처리를 하기 위한 영역입니다. -->
+	<select id="listPostWithPaging" resultMap="replyResultMap">
+	<![CDATA[
+	 select *
+	   from (
+			select rownum rn, p.id, p.content, p.writer_id, p.obj_type, p.title, p.like_count, p.dislike_count, p.viewcnt, p.reg_date, p.update_date, 
+				   w.id w_id, w.nickname w_nickname
+			  from T_Reply p
+				   left outer join T_Party w on p.writer_id = w.id
+	]]>
+		<include refid="searchSql"></include>
+	<![CDATA[
+			   and rownum <= #{criteria.limit}
+			 order by p.id desc
+			)
+	  where rn > #{criteria.offset}
+	]]>
+	</select>
+	
+	<!-- 게시글 등록을 위한 영역 입니다. -->
+	<insert id="registerPost">
+		<selectKey keyProperty="id" order="BEFORE" resultType="long">
+			select seq4Reply_id.nextval from dual
+		</selectKey>
+		<![CDATA[
+		insert into T_Reply(id, title, content, writer_id, viewcnt, obj_type, board_id)
+		       values(#{id}, #{title, jdbcType=VARCHAR}, #{content, jdbcType=VARCHAR}, #{writer.id}, #{viewcnt}, 'post', #{boardId})
+		]]>
+	</insert>
+	
+	<!-- 게시글 수정을 위한 영역 입니다. -->
+	<update id="updatePost">
+	<![CDATA[
+		update T_Reply
+		   set title = #{title},
+		       content = #{content},
+		       update_date = sysdate
+		 where id = #{id}
+	]]>
+	</update>
+	
+	<!--게시글의 조회수 처리를 위한 영역 입니다. -->
+	<update id="incViewCnt">
+	<![CDATA[
+		update T_Reply
+		   set viewcnt = viewcnt + 1
+		 where id = #{id}
+	]]>
+	</update>
+	
+	<!--게시글의 좋아요 처리를 위한 영역 입니다.  -->
+	<!-- public int likePost(long postId, int likeToggle); -->
+	<update id="likePost">
+	<![CDATA[
+		update T_Reply
+		   set like_count = like_count + #{likeToggle}
+		 where id = #{postId}
+	]]>
+	</update>
+	
+	<!-- 게시글의 좋아요 개수를 읽기 위한 영역 입니다. -->
+	<select id="readLikeCount" resultType="_int">
+	select like_count
+	  from T_Reply
+	 where id = #{postId}
+	</select>
+	
+	<!-- 이 아래는 싫어요 처리를 위한 영역 입니다. -->
+	<!-- public int dislikePost(long postId, int dislikeToggle); -->
+	<update id="dislikePost">
+	<![CDATA[
+		update T_Reply
+		   set dislike_count = dislike_count + #{dislikeToggle}
+		 where id = #{postId}
+	]]>
+	</update>
+	
+	<!-- 게시글의 싫어요 개수를 읽기 위한 영역 입니다. -->
+	<select id="readDislikeCount" resultType="_int">
+	select dislike_count
+	  from T_Reply
+	 where id = #{postId}
+	</select>
+	
+	<!-- 이 아래는 댓글 처리를 위한 영역 입니다. -->
+	<!-- public long countTotalReplyWithPaging(@Param("originalId") long originalId); -->
+	<select id="countTotalReplyWithPaging" resultType="_long">
+	<![CDATA[
+		select count(*)
+		  from T_Reply p
+	     where p.original_id = #{originalId}
+	]]>
+	</select>
+	
+	<!-- 댓글 개수 산출을 위한 부분의 성능을 페이징 처리와 함께 생각하였을 때
+		해당 페이지에 대응하는 게시물을 빠르게 선택하여 그 다음에 댓글 개수를 산출합니다.
+		그리고 게시글 정보 및 작성자 정보를 최종적으로 연결하였다.
+	 -->
+	<!-- public List<ReplyVO> findReplyWithPaging(@Param("originalId") long originalId, @Param("criteria") Criteria criteria); -->
+	<select id="listReplyWithPaging" resultMap="replyResultMap">
+	<![CDATA[
+		select r.*, n.count_of_reply, w.id w_id, w.nickname w_nickname
+		  from (select m.id, count(rr.id) count_of_reply
+		          from (select *       
+		                  from (select q.*, rownum rn
+		                          from (select p.*
+		                                  from T_Reply p 
+		                                 where original_id = #{originalId}
+		                                 order by id desc) q
+		                         where rownum <= #{criteria.limit}) s
+		                 where rn > #{criteria.offset}) m
+		                       left outer join T_Reply rr on m.id = rr.original_id
+		                 group by m.id) n, T_Reply r
+		       left outer join T_Party w on r.writer_id = w.id
+		 where n.id = r.id
+		 order by r.id desc
+    ]]>
+	</select>
+	
+	<!-- 게시글에 달린 댓글을 찾기 위한 영역 입니다.  -->
+	<!-- public ReplyVO findReplyById(long id); -->
+	<select id="findReplyById" resultMap="replyResultMap">
+	<![CDATA[
+		select p.board_id, p.id, p.content, p.writer_id, p.title, p.like_count, p.dislike_count, p.obj_type, p.reg_date, p.update_date, c.count_of_reply,
+			   w.id w_id, w.nickname w_nickname, ht.id ht_id, ht.word ht_word
+		  from (
+		  		select a.id, count(b.id) count_of_reply
+		  		  from T_Reply a
+		  		       left outer join T_Reply b on a.id = b.original_id
+		  		 where a.id = #{id}
+		  		 group by a.id
+		  	   ) c, T_Reply p
+			   left outer join T_Party w on p.writer_id = w.id
+			   left outer join M_HT_Reply mht on p.id = mht.reply_id
+			   left outer join T_Hash_Tag ht on mht.hash_tag_id = ht.id
+		 where c.id = p.id
+	]]>
+	</select>
+	
+	<!-- 댓글 등록 처리를 위한 영역입니다. -->
+	<!--	public void registerReply(ReplyVO reply);	-->
+	<insert id="registerReply">
+		<selectKey keyProperty="id" order="BEFORE" resultType="long">
+			select seq4Reply_id.nextval from dual
+		</selectKey>
+		<![CDATA[
+		insert into T_Reply(id, original_id, content, writer_id, viewcnt, obj_type)
+		       values(#{id}, #{originalId}, #{content, jdbcType=VARCHAR}, #{writer.id}, null, 'reply')
+		]]>
+	</insert>
+	
+	<!-- 댓글 수정 처리를 위한 영역입니다. -->
+	<!-- 	public boolean updateReply(ReplyVO reply); -->
+	<update id="updateReply">
+	<![CDATA[
+		update T_Reply
+		   set content = #{content},
+		       update_date = sysdate
+		 where id = #{id}
+	]]>
+	</update>
+
+	<!-- 댓글 삭제 처리를 위한 영역입니다. -->
+	<!-- public boolean removeReply(ReplyVO reply); -->
+	<delete id="removeReply">
+	<![CDATA[
+		delete from T_Reply
+		 where id = #{id}
+	]]>
+	</delete>
+</mapper>

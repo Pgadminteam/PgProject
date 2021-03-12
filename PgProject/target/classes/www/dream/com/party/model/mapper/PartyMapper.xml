@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="www.dream.com.party.model.mapper.PartyMapper">
+
+	<resultMap id="partyResultMap"
+		type="www.dream.com.party.model.PartyVO"
+		extends="www.dream.com.framework.model.mapper.FrameworkMapper.commonMngInfoResultMap">
+		<constructor>
+			<idArg column="id" javaType="_long" />
+		</constructor>
+		<result property="name" column="name" />
+		<result property="birthDate" column="birth_date" />
+		<result property="loginId" column="login_id" />
+		<result property="password" column="password" />
+		<result property="nickname" column="nickname" />
+		<collection property="listAuthority"
+			ofType="www.dream.com.party.model.AuthorityVO" columnPrefix="auth_">
+			<result property="authority" column="name" />
+		</collection>
+	</resultMap>
+
+	<!-- 모든 회원의 모든 정보 출력 -->
+	<select id="selectAllParty"
+		resultMap="partyResultMap">
+	<![CDATA[
+		select *
+		  from T_Party
+	]]>
+	</select>
+
+	<!-- 'ROLE_MEMBER'를 가진 모든 회원의 갯수 출력 -->
+	<select id="countTotalPartyWithPaging" resultType="_long" > 
+	<![CDATA[
+		select count(*)
+		  from T_Party p
+		  	left outer join T_Authority a on p.id = a.party_id
+	     where a.auth_name='ROLE_MEMBER'
+	]]>
+	</select>
+	
+	<!-- MEMBER권한(시스템 사용자)을 가진 사용자를 해당 페이지 번호에 따라 한정적으로 조회합니다. -->
+	<select id="listPartyWithPaging" resultMap="partyResultMap">
+	<![CDATA[
+	 select *
+	   from (
+			select rownum rn, p.*
+	      from T_Party p
+	         left outer join T_Authority a on p.id = a.party_id
+	     where a.auth_name='ROLE_MEMBER'
+			   and rownum <= #{limit}
+			)
+	  where rn > #{offset}
+	  	order by id
+	]]>
+	</select>
+
+	<!--  public PartyVO findPersonByLoginId(@Param("loginId") String loginId); -->
+	<!-- loginId를 바탕으로 회원 정보와 권한을 출력 src/test/java에서 junitTest를 위해 사용함-->
+	<select id="findPersonByLoginId" resultMap="partyResultMap">
+	<![CDATA[
+		select m.*, t.name auth_name
+		  from (select p.*, a.auth_name auth
+ 	      	      from T_Party p
+                       left outer join T_Authority a on p.id = a.party_id
+	             where p.login_id = #{loginId}) m,
+	           T_Authority_Type t
+	     START WITH t.name = m.auth
+	   CONNECT BY PRIOR t.name = t.super_auth_name
+	]]>
+	</select>
+	
+	<!-- public PartyVO findPartyById(long id); -->
+	<!-- id값이 일치하는 회원의 모든 정보 출력 -->
+	<select id="findPartyById" resultMap="partyResultMap">
+	<![CDATA[
+		select *
+			from T_Party
+		  where id = #{id}
+	]]>
+	</select>
+	
+	<!-- public PartyVO findPartyById(long id); -->
+	<!-- loginId값이 일치하는 회원의 모든 정보 출력 -->
+	<select id="findPartyByLoginId"
+		resultMap="partyResultMap">
+	<![CDATA[
+		select p.*
+		  from T_Party p
+		 where login_id = #{loginId}
+	]]>
+	</select>
+
+	<!-- 폼에서 입력된 모든 값들을 받아와 T_Party의 각 컬럼에 대조해 db에 입력한다. id값은 sequence를 이용해 값을 1씩 증가시키게 만들었음 -->
+	<insert id="registerParty">
+		<selectKey keyProperty="id" order="BEFORE" resultType="long">
+			select seq4Party_id.nextval from dual
+		</selectKey>
+		insert into T_Party(id, name, birth_date, login_id, password, nickname)
+		       values(#{id}, #{name}, #{birthDate}, #{loginId}, #{password, jdbcType=VARCHAR}, #{nickname, jdbcType=VARCHAR})
+	</insert>
+	
+	<!-- 방금 회원가입한 사람의 id값은 제일 마지막이고 그 값을 authority의 id값에 연결 후 'ROLE_MEMBER'라는 권한을 부여함 -->
+	<insert id="registerAuthority">
+			insert into T_Authority (party_id, auth_name)
+				values ((SELECT MAX(id) AS p_id FROM T_Party p), 'ROLE_MEMBER')
+	</insert>
+
+	<!-- public boolean modifyParty(PartyVO newbie); -->
+	<!-- 수정하는 정보는 이름, 닉네임, 생일 3가지이며 각각의 값을 jdbcType에 맞게 입력되게 하고 db에 update함 -->
+	<update id="modifyParty">
+	<![CDATA[
+		update T_Party
+		   set name = #{name, jdbcType=VARCHAR},
+		       nickname = #{nickname, jdbcType=VARCHAR},
+		       birth_date = #{birthDate, jdbcType=DATE},
+		       update_date = sysdate
+		 where id = #{id}
+	]]>
+	</update>
+
+	<!-- public boolean removeParty(PartyVO newbie); -->
+	<!-- id값이 같은 회원의 한 행을 T_Party에서 delete함 -->
+	<delete id="removeParty">
+		delete from T_Party
+			where id = #{id}
+	</delete>
+	
+	<!-- 탈퇴 시 Authority도 같이 삭제되어야 함 -->
+	<insert id="removeAuthority">
+		delete from T_Authority
+			where party_id = #{id}
+	</insert>
+	
+	<!-- id값이 담긴 배열을 foreach를 이용해 T_Party에서 한번에 delete함 -->
+	<delete id="removeAdminParty">
+		delete from T_Party
+			where id in
+			<foreach collection='array' item='id' open="(" separator="," close=")">
+			#{id}
+			</foreach>
+	</delete>
+	
+	<!-- 탈퇴 시 Authority도 같이 삭제되어야 함 -->
+	<insert id="removeAdminAuthority">
+		delete from T_Authority
+			where party_id in
+			<foreach collection='array' item='id' open="(" separator="," close=")">
+			#{id}
+			</foreach>
+	</insert>	 
+
+	<!-- public boolean changePW(PartyVO newbie); -->
+	<!-- 비밀번호를 변경하기 위해 같은 id값의 회원의 password만 update함 -->
+	<update id="changePW">
+	<![CDATA[
+		update T_Party
+		   set password = #{password}
+		 where id = #{id}
+	]]>
+	</update>
+		
+	<!-- id와 nickname이 중복되는지 확인하고 중복되면 1 값이 없으면 0으로 출력 -->
+	<!--  public boolean chkIdDup(String newId); -->
+	<select id="chkIdDup" resultType="boolean">
+		SELECT CASE WHEN COUNT(*) = 0 THEN 0
+       		   ELSE 1 END
+		  FROM T_Party
+		 WHERE login_id = #{newId}
+	</select>
+	
+	<!--  public boolean chkNickDup(String newNick); -->
+	<select id="chkNickDup" resultType="boolean">
+		SELECT CASE WHEN COUNT(*) = 0 THEN 0
+       		   ELSE 1 END
+		  FROM T_Party
+		 WHERE nickname = #{newNick}
+	</select>
+	
+	<!-- public boolean chkNickDupInModify(String newNick); -->
+	<!-- modifyParty에서 사용하는데 내 닉네임을 변경하고싶지 않을경우에 내 id값의 nickname을 제외한 나머지 값에서 중복이 되는지 찾음 -->
+	<select id="chkNickDupInModify" resultType="boolean">
+		SELECT CASE WHEN COUNT(*) = 0 THEN 0
+       		   ELSE 1 END
+		  FROM T_Party
+		 WHERE id != #{id}
+            AND nickname = #{newNick}
+	</select>
+
+	<!-- src/test/java에서 junitTest때 사용함(insert로 값 넣은 후 비밀번호 암호화로 값을 다시 넣어보기 위해 만듦) 웹에서 사용 안 함 -->
+	<!-- public boolean changePwd(PersonVO person); -->
+	<update id="changePwd">
+	<![CDATA[
+		update T_Party
+		   set password = #{password}
+		 where id = #{id}
+	]]>
+	</update>
+	
+	<!-- 이 아래는 입력받은 name, LoginId가 party 테이블의 name, loginId와 같은지 비교합니다.-->
+	<!--  public boolean chkNameDup(String inputName); -->
+	<select id="chkNameExist" resultType="boolean">
+		SELECT CASE WHEN COUNT(*) = 0 THEN 0
+       		   ELSE 1 END
+		  FROM T_Party
+		 WHERE name = #{chkName}
+	</select>
+	
+	<!--  public boolean chkLoginIdDup(String inputLoginId); -->
+	<select id="chkLoginIdExist" resultType="boolean">
+		SELECT CASE WHEN COUNT(*) = 0 THEN 0
+       		   ELSE 1 END
+		  FROM T_Party
+		 WHERE login_id = #{chkLoginId}
+	</select>
+	
+	<!-- public void updateTmpPw(PartyVO newbie); -->
+	<!-- name과 login_id가 일치하는 회원에 임시비밀번호를 랜덤으로 생성하고 그 값을 password에 넣는다. -->
+	<update id="updateTmpPw">
+		update T_Party
+		   set 
+		   <if test="password != null">
+		  	   password = #{password}
+		   </if>
+		 where name = #{name}
+		   and login_id = #{loginId}
+	</update>
+	
+</mapper>

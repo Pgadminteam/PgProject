@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="www.dream.com.framework.hashTagAnalyzer.model.mapper.HashTagMapper">
+	<resultMap id="hashTagResultMap"
+		type="www.dream.com.framework.hashTagAnalyzer.model.HashTagVO">
+		<constructor>
+			<idArg column="id" javaType="long" />
+		</constructor>
+		<result property="word" column="word" />
+	</resultMap>
+
+	<!-- 해시태그가 이미 존재하는지 찾기 위한 영역입니다. -->
+	<select id="findExisting" resultMap="hashTagResultMap">
+		select id, word
+		  from T_Hash_Tag
+		 where word in
+		 	   <foreach item="word" collection="array" open="(" separator="," close=")">
+		 	   		#{word}
+		 	   </foreach> 
+	</select>
+	
+	<!-- 해시태그 생성 시 새로운 id 값을 찾기 위한 영역입니다. -->
+	<!-- public int createHashTag(List<HashTagVO> listHashTag);
+		여러 건의 데이터를 insert 하는 방법으로 자바에서 반복문을 통하여 반복적으로 DB에게 의뢰하는 방법
+			seq.nextVal을 사용하면 속도가 느리고 성능이 낮음
+		일괄 insert하는 방법 : 성능 관점에서 이 방법을 채택하여야 함.  
+	-->
+	<select id="selectNewID" resultType="long">
+		select max(newid)
+		  from (
+			   select 1 as newid from dual 
+			   union 
+			   select newid 
+			     from (
+			          select (id + 1) as newid
+                        from T_Hash_Tag
+                       where rownum = 1
+                       order by id desc
+                       )
+               )
+	</select>
+	
+	<!-- 해시태그 생성을 위한 영역입니다. -->
+	<insert id="createHashTag">
+ 	   <foreach item="obj" collection="list" open="INSERT ALL " close=" SELECT * FROM DUAL">
+			INTO T_Hash_Tag(id, word)
+			VALUES (#{obj.id}, #{obj.word})
+ 	   </foreach>
+	</insert>
+	
+	<!-- 글과의 해시태그 관계를 생성/삭제 하기 위한 영역입니다. -->
+	<!-- 	public void createRelWithReply(@Param("replyId") long replyId, @Param("listHashTag") List<HashTagVO> listHashTag); -->
+	<insert id="createRelWithReply">
+ 	   <foreach item="obj" collection="listHashTag" open="INSERT ALL " close=" SELECT * FROM DUAL">
+			INTO M_HT_Reply(hash_tag_id, reply_id)
+			VALUES (#{obj.id}, #{replyId})
+ 	   </foreach>
+	</insert>
+	
+	<!-- 	public void deleteRelWithReply(long replyId);  -->
+	<delete id = "deleteRelWithReply">
+		delete from M_HT_Reply where reply_id = #{replyId}
+	</delete>
+</mapper>

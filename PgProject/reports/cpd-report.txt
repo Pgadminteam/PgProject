@@ -1,0 +1,15 @@
+Found a 11 line (65 tokens) duplication in the following files: 
+Starting at line 39 of C:\StsWorkspace\BoardSystemFinalized\src\test\java\www\dream\com\framework\hashTagAnalyzer\mapper\HasgTagMapperTest.java
+Starting at line 18 of C:\StsWorkspace\BoardSystemFinalized\src\test\java\www\dream\com\framework\hashTagAnalyzer\mapper\ToCheckIDCollision.java
+
+	public void createHashTagByBatch() {
+		try {
+			List<HashTagVO> listNewTag = new ArrayList<>();
+			HashTagVO ddd = new HashTagVO();
+			ddd.setWord("AAAA");
+			listNewTag.add(ddd);
+			ddd = new HashTagVO();
+			ddd.setWord("BBBBB");
+			listNewTag.add(ddd);
+			
+			HashTagService hashTagService = BeanUtil.getBean(HashTagService.class);

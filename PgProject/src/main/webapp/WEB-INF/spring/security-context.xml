@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:security="http://www.springframework.org/schema/security"
+	xsi:schemaLocation="http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-5.3.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+<!-- 단독으로 설정이 가능하여 기존의 root-context나 servlet-context와 별도로 작성하는 것이 좋음(나중에 유지보수성을 위해 고치기에도 편함) -->
+	<bean id="customLoginSuccess" class="www.dream.com.party.security.CustomLoginSuccessHandler"></bean>
+	<bean id="customAccessDenied" class="www.dream.com.party.security.CustomAccessDeniedHandler"></bean>
+	<bean id="myChoosenPwdEncoder" class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder"></bean>
+	<bean id="customUserDetailsService" class="www.dream.com.party.security.CustomUserDetailsService"></bean>
+
+	<security:http>
+		<security:intercept-url pattern="/" access="permitAll"/>
+		<security:intercept-url pattern="/post/listPost?boardId=2" access="hasRole('ROLE_ADMIN')"/>
+		<security:intercept-url pattern="/party/listParty" access="hasRole('ROLE_ADMIN')"/>
+		<security:intercept-url pattern="/post/listPost?boardId=1" access="hasRole('ROLE_MEMBER')"/>
+		<security:access-denied-handler ref="customAccessDenied"/>
+		<security:form-login login-page="/customLogin" authentication-success-handler-ref="customLoginSuccess"/>
+		<security:logout logout-url="/customLogout" invalidate-session="true" delete-cookies="remember-me,JSESSION_ID"/>
+		<security:remember-me data-source-ref="dataSource" token-validity-seconds="60"/>
+	</security:http>
+	<security:authentication-manager>
+		<security:authentication-provider user-service-ref="customUserDetailsService">
+		<security:password-encoder ref="myChoosenPwdEncoder"/>
+		</security:authentication-provider>
+	</security:authentication-manager>
+</beans>

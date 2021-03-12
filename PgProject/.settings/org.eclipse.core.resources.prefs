@@ -1,0 +1,4 @@
+eclipse.preferences.version=1
+encoding//src/main/webapp/WEB-INF/views/party/include/partyCommon.jsp=UTF-8
+encoding//src/main/webapp/WEB-INF/views/post/include/postCommon.jsp=UTF-8
+encoding//src/main/webapp/WEB-INF/views/post/listPost.jsp=UTF-8

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="www.dream.com.framework.attachFile.model.mapper.AttachMapper">
+	<resultMap id="attachResultMap"
+		type="www.dream.com.framework.attachFile.model.AttachVO">
+		<constructor>
+			<idArg column="uuid" javaType="String" />
+			<arg column="owner_type" javaType="String"></arg>
+			<arg column="owner_id" javaType="_long"></arg>
+		</constructor>
+		<result property="uploadPath" column="upload_path" />
+		<result property="fileName" column="file_name" />
+		<result property="originalFilename" column="original_file_name" />
+		<result property="fileType" column="file_type" />
+		<result property="uploadedThumdnailFileName" column="thumbnail_file_name" />
+	</resultMap>
+	
+	<!-- 첨부 파일 목록 처리를 위한 영역입니다. -->
+	<!-- public List<AttachVO> listAttach(AttachVO attachVO); -->
+	<select id="listAttach" resultMap="attachResultMap">
+	<![CDATA[
+		select *
+		  from T_Attach
+		 where owner_type = #{ownerType}
+		   and owner_id = #{ownerId}
+	]]>
+	</select>
+	
+	<!-- 파일 첨부 처리를 위한 영역입니다. -->
+	<!-- public void createAttach(IAttacher owner); -->
+	<insert id="createAttach">
+ 	   <foreach item="attach" collection="listAttach" open="INSERT ALL " close=" SELECT * FROM DUAL">
+			INTO T_Attach (owner_type, owner_id, uuid, upload_path, 
+				file_name, original_file_name, thumbnail_file_name, file_type)
+			VALUES (#{ownerType}, #{id}, #{attach.uuid}, #{attach.uploadPath},
+				 #{attach.fileName}, #{attach.originalFilename}, #{attach.uploadedThumdnailFileName, jdbcType=VARCHAR}, #{attach.fileType})
+ 	   </foreach>
+	</insert>
+	
+	<!-- 첨부 파일 삭제 처리를 위한 영역입니다. -->
+	<!-- public void deleteAttach(IAttacher owner);  -->
+	<delete id="deleteAttach">
+	<![CDATA[
+		delete from T_Attach
+		 where owner_type = #{ownerType}
+		   and owner_id	= #{id}
+	]]>
+	</delete>
+	
+</mapper>
